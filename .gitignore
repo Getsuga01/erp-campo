@@ -1,0 +1,26 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+.pytest_cache/
+
+# Segredos e ambiente
+.env
+
+# Bancos locais
+*.db
+*.sqlite
+*.sqlite3
+
+# Workspace de execução do plano (SDD)
+.superpowers/
+
+# Docker
+oracle-data/
+
+# IDE / OS
+.idea/
+.vscode/
+Thumbs.db
