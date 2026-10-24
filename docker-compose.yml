@@ -1,0 +1,45 @@
+# =============================================================================
+# Projeto 2 (demo fictícia) — Integração Sistema de Campo → ERP
+# Fase 1 — Infraestrutura: apenas o serviço de banco Oracle XE.
+#
+# Os serviços de aplicação (simulador :8001, integrador :8002 e painel
+# Streamlit) serão adicionados na Fase 7, por outra etapa do plano.
+#
+# Como usar:
+#   1) Copie `.env.example` para `.env` e informe `ORACLE_PASSWORD`.
+#   2) `docker compose up -d` — no PRIMEIRO boot os scripts de `./db` são
+#      executados pelo sqlplus em ordem alfabética (01_… 08_).
+#   3) Conexão (JDBC/python-oracledb): localhost:1521/XEPDB1 — usuários
+#      SYSTEM, ERP_SUPRIMENTOS e INTEGRACAO (senhas em db/01_schema.sql).
+# =============================================================================
+services:
+  oracle:
+    image: gvenzl/oracle-xe:21-slim
+    container_name: campo-erp-oracle
+    ports:
+      - "1521:1521"
+    environment:
+      # Senha do usuário SYSTEM, lida do arquivo .env (nunca versionado).
+      ORACLE_PASSWORD: "${ORACLE_PASSWORD:?ORACLE_PASSWORD nao definida — copie .env.example para .env e defina a variavel}"
+      # Charset do cliente sqlplus: garante que os scripts UTF-8 (com acentos)
+      # sejam lidos e gravados corretamente no banco (AL32UTF8).
+      NLS_LANG: "_._.AL32UTF8"
+    volumes:
+      # Datafiles persistidos entre reinicializações do container.
+      - oracle-data:/opt/oracle/oradata
+      # Scripts de criação (schemas, DDL, views, carga e grants) — executados
+      # SOMENTE no primeiro boot, em ordem alfabética (01_schema … 08_grants).
+      - ./db:/container-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD", "healthcheck.sh"]
+      interval: 30s
+      timeout: 10s
+      retries: 10
+      # O primeiro boot (criação do banco + scripts de init) demora alguns
+      # minutos; o período inicial evita falsos "unhealthy".
+      start_period: 5m
+
+volumes:
+  # Volume nomeado e persistente com os datafiles do Oracle.
+  oracle-data:
+    name: campo-erp-oracle-data
