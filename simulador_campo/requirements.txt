@@ -1,0 +1,7 @@
+# Dependências do Simulador do Sistema de Campo (Módulo A)
+fastapi>=0.115  # framework da API
+uvicorn[standard]>=0.30  # servidor ASGI (uvicorn main:app --port 8001)
+pydantic>=2.7  # modelos e validação do contrato de dados
+pydantic-settings>=2.3  # settings via env vars com prefixo CAMPO_
+faker>=25.0  # geração de dados fictícios em pt_BR (operador, observação)
+httpx>=0.27  # exigido pelo fastapi.testclient (smoke tests)
