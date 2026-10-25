@@ -20,10 +20,10 @@ services:
       - "1521:1521"
     environment:
       # Senha do usuário SYSTEM, lida do arquivo .env (nunca versionado).
+      # NOTA: não definir NLS_LANG aqui — a forma "_._.AL32UTF8" quebra os
+      # CONNECTs internos do entrypoint (ORA-12705). A imagem gvenzl já
+      # gerencia o charset do cliente sqlplus para scripts UTF-8.
       ORACLE_PASSWORD: "${ORACLE_PASSWORD:?ORACLE_PASSWORD nao definida — copie .env.example para .env e defina a variavel}"
-      # Charset do cliente sqlplus: garante que os scripts UTF-8 (com acentos)
-      # sejam lidos e gravados corretamente no banco (AL32UTF8).
-      NLS_LANG: "_._.AL32UTF8"
     volumes:
       # Datafiles persistidos entre reinicializações do container.
       - oracle-data:/opt/oracle/oradata
