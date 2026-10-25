@@ -80,7 +80,10 @@ def listar_paginado(
     """Lista apontamentos em ordem estável (created_at, id) ascendente.
 
     O cursor é a tupla (created_at, id) da última linha servida. Retorna os
-    payloads e o próximo cursor (ou None quando não há mais registros).
+    payloads e o próximo cursor — SEMPRE a posição da última linha servida
+    quando ao menos 1 item foi servido (inclusive na última página parcial);
+    None SOMENTE quando a página veio vazia (emenda R9: o consumidor para
+    quando recebe menos itens que o limite pedido).
     """
     conn = conectar()
     try:
@@ -100,11 +103,17 @@ def listar_paginado(
         linhas = conn.execute(sql, parametros).fetchall()
     finally:
         conn.close()
-    tem_proxima = len(linhas) > limite
+    # Busca limite+1 apenas para fatiar em "limite" linhas servidas (o excesso
+    # é descartado); a sinalização de "tem mais" deixou de ser necessária — o
+    # consumidor para quando recebe menos itens que o limite (emenda R9).
     linhas = linhas[:limite]
     itens = [json.loads(linha["payload"]) for linha in linhas]
+    # Emenda R9: o cursor retornado é a posição da ÚLTIMA LINHA SERVIDA,
+    # sem condicionar a "existe próxima página" — assim o consumidor pode
+    # avançar seu cursor para uma posição exata mesmo quando os dados
+    # acabam no meio de uma página. None apenas quando nada foi servido.
     proximo_cursor = (
-        (linhas[-1]["created_at"], int(linhas[-1]["id"])) if tem_proxima and linhas else None
+        (linhas[-1]["created_at"], int(linhas[-1]["id"])) if linhas else None
     )
     return itens, proximo_cursor
 

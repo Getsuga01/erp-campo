@@ -16,8 +16,11 @@ def listar_apontamentos(
     """Lista apontamentos em ordem de ingestão com paginação por cursor.
 
     Contrato fixo: resposta `{"itens": [<apontamento>...], "proximo_cursor": "<CURSOR>|null"}`.
-    O cursor é `created_at|id` da última linha servida; `proximo_cursor` é
-    null quando não há mais registros.
+    O cursor é `created_at|id` da última linha servida. `proximo_cursor` é
+    SEMPRE a posição da última linha servida quando ao menos 1 item foi
+    retornado (inclusive na última página parcial); é null somente quando
+    não há itens a servir (emenda R9: o consumidor para quando recebe uma
+    página com menos itens que o limite pedido).
 
     Exemplo:
         GET /apontamentos?limite=100
