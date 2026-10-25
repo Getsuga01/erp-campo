@@ -20,6 +20,10 @@
 SET DEFINE OFF;
 WHENEVER SQLERROR EXIT SQL.SQLCODE;
 
+-- Objetos da demo vivem no PDB XEPDB1 (ver 01_schema.sql); cada script roda
+-- em sessão sqlplus nova conectada ao CDB$ROOT — trocar de container aqui.
+ALTER SESSION SET CONTAINER = XEPDB1;
+
 -- ---------------------------------------------------------------------------
 -- TALHAO (20 parcelas fictícias)
 -- ---------------------------------------------------------------------------

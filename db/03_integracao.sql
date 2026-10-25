@@ -13,10 +13,14 @@
 --                                  recebido; `id_origem` (UK) garante a
 --                                  idempotência; `status` alimenta a
 --                                  conciliação (views do 06_views.sql).
---               Índices adicionais em id_origem (além da UK), lote_id e
---               status para as consultas do integrador e do painel.
+--               Índices adicionais em lote_id e status para as consultas do
+--               integrador e do painel (id_origem já é indexado pela UK).
 --------------------------------------------------------------------------------
 WHENEVER SQLERROR EXIT SQL.SQLCODE;
+
+-- Objetos da demo vivem no PDB XEPDB1 (ver 01_schema.sql); cada script roda
+-- em sessão sqlplus nova conectada ao CDB$ROOT — trocar de container aqui.
+ALTER SESSION SET CONTAINER = XEPDB1;
 
 -- Cursor incremental: uma linha por origem de dados. `posicao` guarda a
 -- marca-d'água no formato definido pelo integrador (timestamp ISO-8601 UTC).
@@ -67,9 +71,9 @@ CREATE TABLE INTEGRACAO.INT_REGISTRO (
   CONSTRAINT CK_INT_REGISTRO_ORIGEM   CHECK (origem IN ('CICLO', 'REPROCESSAMENTO', 'MANUAL'))
 );
 
--- Índices de apoio (a UK já indexa id_origem; criado índice explícito conforme
--- plano): consultas por lote, por status (painel/fila) e por id_origem.
-CREATE INDEX INTEGRACAO.IX_INT_REGISTRO_ID_ORIGEM ON INTEGRACAO.INT_REGISTRO (id_origem);
+-- Índices de apoio: consultas por lote e por status (painel/fila). Nota: a
+-- UK_INT_REGISTRO_ORIGEM já indexa id_origem automaticamente — não é criado
+-- índice adicional sobre a mesma lista de colunas (Oracle emite ORA-01408).
 CREATE INDEX INTEGRACAO.IX_INT_REGISTRO_LOTE      ON INTEGRACAO.INT_REGISTRO (lote_id);
 CREATE INDEX INTEGRACAO.IX_INT_REGISTRO_STATUS    ON INTEGRACAO.INT_REGISTRO (status);
 

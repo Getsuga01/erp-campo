@@ -18,6 +18,14 @@
 --------------------------------------------------------------------------------
 WHENEVER SQLERROR EXIT SQL.SQLCODE;
 
+-- A imagem gvenzl executa este script via "sqlplus / as sysdba", que conecta
+-- ao CDB$ROOT. Toda a demo (usuários, dados e aplicações) vive no PDB XEPDB1,
+-- então trocamos de container no início de CADA script — cada arquivo roda em
+-- uma sessão sqlplus nova. Aqui isso também garante que os usuários sejam
+-- LOCAIS do PDB (e não comuns replicados sem privilégios, como ocorre ao
+-- criar no root — o que derruba o login com ORA-01045 em XEPDB1).
+ALTER SESSION SET CONTAINER = XEPDB1;
+
 -- Schema do ERP fictício (referência cruzada com o "Projeto 1").
 CREATE USER ERP_SUPRIMENTOS IDENTIFIED BY "ErpSuprimentosFicticio2026"
   DEFAULT TABLESPACE USERS

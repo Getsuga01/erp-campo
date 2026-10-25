@@ -28,6 +28,10 @@
 --------------------------------------------------------------------------------
 WHENEVER SQLERROR EXIT SQL.SQLCODE;
 
+-- Objetos da demo vivem no PDB XEPDB1 (ver 01_schema.sql); cada script roda
+-- em sessão sqlplus nova conectada ao CDB$ROOT — trocar de container aqui.
+ALTER SESSION SET CONTAINER = XEPDB1;
+
 CREATE OR REPLACE VIEW INTEGRACAO.V_CONCILIACAO_DIA_TIPO AS
 SELECT TRUNC(r.recebido_em) AS dia,
        r.tipo,
