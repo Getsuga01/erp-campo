@@ -34,7 +34,7 @@ def _pegar_item_vencido() -> tuple[int, int] | None:
         cur = conn.cursor()
         cur.execute(
             "SELECT f.id, f.registro_id FROM FILA_REPROCESSAMENTO f "
-            " WHERE f.situacao = 'PENDENTE' AND f.proxima_tentativa <= SYSTIMESTAMP "
+            " WHERE f.situacao = 'PENDENTE' AND f.proxima_tentativa <= SYSDATE "
             "   AND ROWNUM = 1 FOR UPDATE SKIP LOCKED"
         )
         linha = cur.fetchone()
@@ -42,7 +42,7 @@ def _pegar_item_vencido() -> tuple[int, int] | None:
             return None
         fila_id, registro_id = int(linha[0]), int(linha[1])
         cur.execute(
-            "UPDATE FILA_REPROCESSAMENTO SET situacao = 'PROCESSANDO', atualizado_em = SYSTIMESTAMP "
+            "UPDATE FILA_REPROCESSAMENTO SET situacao = 'PROCESSANDO', atualizado_em = SYSDATE "
             " WHERE id = :fila_id",
             {"fila_id": fila_id},
         )
@@ -100,7 +100,7 @@ def _reprocessar_um(registro_id: int, observacao: str) -> dict:
                 "UPDATE FILA_REPROCESSAMENTO "
                 "   SET situacao = 'PENDENTE', "
                 "       tentativas = CASE WHEN :resetar = 1 THEN 0 ELSE tentativas END, "
-                "       proxima_tentativa = SYSTIMESTAMP, atualizado_em = SYSTIMESTAMP "
+                "       proxima_tentativa = SYSDATE, atualizado_em = SYSDATE "
                 " WHERE id = :fila_id AND situacao IN ('PENDENTE', 'DEAD_LETTER')",
                 {"resetar": 1 if era_dead_letter else 0, "fila_id": fila_id},
             )
@@ -185,12 +185,12 @@ def _registrar_sucesso(
             cur.execute(
                 "UPDATE INT_REGISTRO "
                 "   SET status = 'GRAVADO', codigo_erro = NULL, mensagem_erro = NULL, "
-                "       processado_em = SYSTIMESTAMP "
+                "       processado_em = SYSDATE "
                 " WHERE id = :registro_id",
                 {"registro_id": registro_id},
             )
         cur.execute(
-            "UPDATE FILA_REPROCESSAMENTO SET situacao = 'CONCLUIDA', atualizado_em = SYSTIMESTAMP "
+            "UPDATE FILA_REPROCESSAMENTO SET situacao = 'CONCLUIDA', atualizado_em = SYSDATE "
             " WHERE id = :fila_id",
             {"fila_id": fila_id},
         )
@@ -227,8 +227,8 @@ def _registrar_falha(
         cur.execute(
             "UPDATE FILA_REPROCESSAMENTO "
             "   SET tentativas = :nova, situacao = :situacao, "
-            "       proxima_tentativa = SYSTIMESTAMP + NUMTODSINTERVAL(:intervalo, 'MINUTE'), "
-            "       atualizado_em = SYSTIMESTAMP "
+            "       proxima_tentativa = SYSDATE + NUMTODSINTERVAL(:intervalo, 'MINUTE'), "
+            "       atualizado_em = SYSDATE "
             " WHERE id = :fila_id",
             {"nova": nova, "situacao": situacao, "intervalo": intervalo_apos(tentativas), "fila_id": fila_id},
         )

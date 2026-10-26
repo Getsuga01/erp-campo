@@ -18,7 +18,7 @@ from erros import ErroRejeicao
 from fila import enfileirar
 from logger import obter_logger
 from models import TipoApontamento
-from oracle_client import transacao
+from oracle_client import transacao, valor_retornado
 
 logger = obter_logger()
 
@@ -50,7 +50,7 @@ def rejeitar(lote_id: int, payload: object, erro: ErroRejeicao) -> int:
                 "registro_id": saida,
             },
         )
-        registro_id = int(saida.getvalue())
+        registro_id = valor_retornado(saida)
         if erro.recuperavel:
             enfileirar(conn, registro_id, erro.mensagem)
     logger.warning(

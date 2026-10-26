@@ -39,6 +39,14 @@ def iniciar_pool() -> None:
     obter_pool()
 
 
+def valor_retornado(variavel: oracledb.Var) -> int:
+    """Extrai o id de uma bind var de RETURNING INTO (uma lista com 1 elemento)."""
+    valor = variavel.getvalue()
+    if isinstance(valor, list):
+        valor = valor[0]
+    return int(valor)
+
+
 def encerrar_pool() -> None:
     """Fecha o pool no shutdown do serviço."""
     global _pool

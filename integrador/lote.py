@@ -14,7 +14,7 @@ processar tudo — nesse caso o cursor não avança e o próximo ciclo repega.
 import oracledb
 
 from logger import obter_logger
-from oracle_client import transacao
+from oracle_client import transacao, valor_retornado
 
 logger = obter_logger()
 
@@ -33,7 +33,7 @@ def criar_lote(cursor_inicio: str | None) -> int:
             "VALUES (:status, :cursor_inicio) RETURNING id INTO :id",
             {"status": STATUS_EM_ANDAMENTO, "cursor_inicio": cursor_inicio, "id": saida},
         )
-        lote_id = int(saida.getvalue())
+        lote_id = valor_retornado(saida)
     logger.info("lote criado", extra={"lote_id": lote_id})
     return lote_id
 
@@ -58,7 +58,7 @@ def fechar_lote(
         recebidos = gravados + rejeitados + int(total_duplicados)
         cur.execute(
             "UPDATE INT_LOTE "
-            "   SET status = :status, fechado_em = SYSTIMESTAMP, "
+            "   SET status = :status, fechado_em = SYSDATE, "
             "       total_recebidos = :recebidos, total_gravados = :gravados, "
             "       total_rejeitados = :rejeitados, total_duplicados = :duplicados, "
             "       cursor_fim = :cursor_fim, observacao = :observacao "

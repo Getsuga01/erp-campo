@@ -41,7 +41,7 @@ def avancar_cursor(posicao: str) -> None:
     with transacao() as conn:
         cur = conn.cursor()
         cur.execute(
-            "UPDATE INT_CURSOR SET posicao = :posicao, atualizado_em = SYSTIMESTAMP "
+            "UPDATE INT_CURSOR SET posicao = :posicao, atualizado_em = SYSDATE "
             "WHERE nome = :nome",
             {"posicao": posicao, "nome": NOME_CURSOR},
         )

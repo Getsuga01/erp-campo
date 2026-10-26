@@ -8,6 +8,7 @@ import oracledb
 
 from config import obter_settings
 from logger import obter_logger
+from oracle_client import valor_retornado
 
 logger = obter_logger()
 
@@ -37,7 +38,7 @@ def enfileirar(conn: oracledb.Connection, registro_id: int, motivo: str, interva
         "INSERT INTO FILA_REPROCESSAMENTO "
         "  (registro_id, situacao, tentativas, max_tentativas, proxima_tentativa, motivo) "
         "VALUES (:registro_id, 'PENDENTE', 0, :max_tentativas, "
-        "        SYSTIMESTAMP + NUMTODSINTERVAL(:intervalo, 'MINUTE'), :motivo) "
+        "        SYSDATE + NUMTODSINTERVAL(:intervalo, 'MINUTE'), :motivo) "
         "RETURNING id INTO :fila_id",
         {
             "registro_id": registro_id,
@@ -47,6 +48,6 @@ def enfileirar(conn: oracledb.Connection, registro_id: int, motivo: str, interva
             "fila_id": saida,
         },
     )
-    fila_id = int(saida.getvalue())
+    fila_id = valor_retornado(saida)
     logger.info(f"registro {registro_id} enfileirado para reprocessamento (fila {fila_id})")
     return fila_id

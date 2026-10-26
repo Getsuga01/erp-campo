@@ -133,7 +133,7 @@ def _processar_item(lote_id: int, item: object) -> int:
         except ErroRejeicao as erro:
             rejeitar(lote_id, item, erro)
             return 0
-        gravar(lote_id, registro)
+        gravar(lote_id, registro, item)
         return 0
     except oracledb.Error:
         raise

@@ -11,12 +11,13 @@ validador (ids já trazidos no RegistroValidado).
 data_hora é normalizada para UTC: o banco guarda TIMESTAMP sem
 timezone, e a convenção da demo é "banco em UTC".
 """
+import json
 from datetime import timezone
 
 import oracledb
 
 from logger import obter_logger
-from oracle_client import transacao
+from oracle_client import transacao, valor_retornado
 from validador import RegistroValidado
 
 logger = obter_logger()
@@ -58,22 +59,29 @@ def inserir_apontamento(conn: oracledb.Connection, registro_id: int, registro: R
     )
 
 
-def gravar(lote_id: int, registro: RegistroValidado) -> int:
+def gravar(lote_id: int, registro: RegistroValidado, payload_original: dict) -> int:
     """Grava o registro (INT_REGISTRO + APONTAMENTO_CAMPO) e retorna o id do registro."""
     modelo = registro.modelo
     with transacao() as conn:
         cur = conn.cursor()
         saida = cur.var(oracledb.DB_TYPE_NUMBER)
         cur.execute(
-            "INSERT INTO INT_REGISTRO (lote_id, id_origem, tipo, status, origem) "
-            "VALUES (:lote_id, :id_origem, :tipo, 'RECEBIDO', 'CICLO') "
+            "INSERT INTO INT_REGISTRO "
+            "  (lote_id, id_origem, tipo, status, payload_original, origem) "
+            "VALUES (:lote_id, :id_origem, :tipo, 'RECEBIDO', :payload, 'CICLO') "
             "RETURNING id INTO :registro_id",
-            {"lote_id": lote_id, "id_origem": modelo.id_origem, "tipo": modelo.tipo.value, "registro_id": saida},
+            {
+                "lote_id": lote_id,
+                "id_origem": modelo.id_origem,
+                "tipo": modelo.tipo.value,
+                "payload": json.dumps(payload_original, ensure_ascii=False),
+                "registro_id": saida,
+            },
         )
-        registro_id = int(saida.getvalue())
+        registro_id = valor_retornado(saida)
         inserir_apontamento(conn, registro_id, registro)
         cur.execute(
-            "UPDATE INT_REGISTRO SET status = 'GRAVADO', processado_em = SYSTIMESTAMP "
+            "UPDATE INT_REGISTRO SET status = 'GRAVADO', processado_em = SYSDATE "
             " WHERE id = :registro_id",
             {"registro_id": registro_id},
         )
