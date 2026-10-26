@@ -1,0 +1,2 @@
+# Testes pytest da Fase 5 — requirements
+pytest
