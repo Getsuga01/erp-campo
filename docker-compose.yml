@@ -1,17 +1,22 @@
 # =============================================================================
 # Projeto 2 (demo fictícia) — Integração Sistema de Campo → ERP
-# Fase 1 — Infraestrutura: apenas o serviço de banco Oracle XE.
-#
-# Os serviços de aplicação (simulador :8001, integrador :8002 e painel
-# Streamlit) serão adicionados na Fase 7, por outra etapa do plano.
+# Fase 7 — Docker Compose completo: Oracle XE + simulador + integrador + painel.
 #
 # Como usar:
-#   1) Copie `.env.example` para `.env` e informe `ORACLE_PASSWORD`.
-#   2) `docker compose up -d` — no PRIMEIRO boot os scripts de `./db` são
-#      executados pelo sqlplus em ordem alfabética (01_… 08_).
-#   3) Conexão (JDBC/python-oracledb): localhost:1521/XEPDB1 — usuários
-#      SYSTEM, ERP_SUPRIMENTOS e INTEGRACAO (senhas em db/01_schema.sql).
+#   1) Copie `.env.example` para `.env` e informe `ORACLE_PASSWORD`
+#      (as demais variáveis têm defaults fictícios de demo).
+#   2) `docker compose up -d --build` — no PRIMEIRO boot do Oracle os scripts
+#      de `./db` rodam via sqlplus em ordem alfabética (01_schema → 08_grants);
+#      com o volume já existente, o banco é reaproveitado sem re-executá-los.
+#   3) Endereços na máquina host: painel http://localhost:8501 ·
+#      simulador http://localhost:8001 · integrador http://localhost:8002 ·
+#      Oracle localhost:1521/XEPDB1.
+#
+# Nota: dentro da rede do compose os serviços se enxergam pelos nomes
+#       (oracle, simulador, integrador) — os defaults de "localhost" do código
+#       são sobrescritos via `environment` abaixo.
 # =============================================================================
+
 services:
   oracle:
     image: gvenzl/oracle-xe:21-slim
@@ -23,12 +28,12 @@ services:
       # NOTA: não definir NLS_LANG aqui — a forma "_._.AL32UTF8" quebra os
       # CONNECTs internos do entrypoint (ORA-12705). A imagem gvenzl já
       # gerencia o charset do cliente sqlplus para scripts UTF-8.
-      ORACLE_PASSWORD: "${ORACLE_PASSWORD:?ORACLE_PASSWORD nao definida — copie .env.example para .env e defina a variavel}"
+      ORACLE_PASSWORD: "${ORACLE_PASSWORD:?ORACLE_PASSWORD nao definida - copie .env.example para .env e defina a variavel}"
     volumes:
       # Datafiles persistidos entre reinicializações do container.
       - oracle-data:/opt/oracle/oradata
       # Scripts de criação (schemas, DDL, views, carga e grants) — executados
-      # SOMENTE no primeiro boot, em ordem alfabética (01_schema … 08_grants).
+      # SOMENTE no primeiro boot, em ordem alfabética (01_schema → 08_grants).
       - ./db:/container-entrypoint-initdb.d:ro
     healthcheck:
       test: ["CMD", "healthcheck.sh"]
@@ -38,6 +43,78 @@ services:
       # O primeiro boot (criação do banco + scripts de init) demora alguns
       # minutos; o período inicial evita falsos "unhealthy".
       start_period: 5m
+
+  simulador:
+    # Módulo A — origem fictícia dos apontamentos (SQLite local; não usa Oracle).
+    build:
+      context: .
+      dockerfile: simulador_campo/Dockerfile
+    ports:
+      - "8001:8001"
+    environment:
+      CAMPO_API_KEY: "${CAMPO_API_KEY:-campo-dev-key-001}"
+      CAMPO_PORTA: "8001"
+      CAMPO_DB_PATH: "${CAMPO_DB_PATH:-data/simulador.db}"
+    healthcheck:
+      test: ["CMD", "python", "-c", "import sys,urllib.request; sys.exit(0 if urllib.request.urlopen('http://localhost:8001/health', timeout=3).status == 200 else 1)"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+  integrador:
+    # Módulo B — ciclo de integração + API administrativa (porta 8002).
+    build:
+      context: .
+      dockerfile: integrador/Dockerfile
+    ports:
+      - "8002:8002"
+    environment:
+      # Na rede do compose o Oracle é "oracle", não localhost.
+      INT_ORACLE_DSN: "${INT_ORACLE_DSN:-oracle:1521/XEPDB1}"
+      INT_ORACLE_USUARIO: "${INT_ORACLE_USUARIO:-INTEGRACAO}"
+      INT_ORACLE_SENHA: "${INT_ORACLE_SENHA:-IntegracaoFicticia2026}"
+      INT_CAMPO_URL: "${INT_CAMPO_URL:-http://simulador:8001}"
+      INT_CAMPO_API_KEY: "${INT_CAMPO_API_KEY:-campo-dev-key-001}"
+      INT_API_KEY: "${INT_API_KEY:-integrador-dev-key-001}"
+    depends_on:
+      oracle:
+        condition: service_healthy
+      simulador:
+        condition: service_started
+    healthcheck:
+      test: ["CMD", "python", "-c", "import sys,urllib.request; sys.exit(0 if urllib.request.urlopen('http://localhost:8002/health', timeout=3).status == 200 else 1)"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+  painel:
+    # Módulo C — painel de conciliação Streamlit (porta 8501).
+    build:
+      context: .
+      dockerfile: painel/Dockerfile
+    ports:
+      - "8501:8501"
+    environment:
+      PAINEL_ORACLE_DSN: "${PAINEL_ORACLE_DSN:-oracle:1521/XEPDB1}"
+      PAINEL_ORACLE_USUARIO: "${PAINEL_ORACLE_USUARIO:-INTEGRACAO}"
+      PAINEL_ORACLE_SENHA: "${PAINEL_ORACLE_SENHA:-IntegracaoFicticia2026}"
+      PAINEL_INTEGRADOR_URL: "${PAINEL_INTEGRADOR_URL:-http://integrador:8002}"
+      PAINEL_INTEGRADOR_API_KEY: "${PAINEL_INTEGRADOR_API_KEY:-integrador-dev-key-001}"
+      PAINEL_PORTA: "8501"
+      PAINEL_AUTO_REFRESH_SEG: "${PAINEL_AUTO_REFRESH_SEG:-0}"
+    depends_on:
+      oracle:
+        condition: service_healthy
+      integrador:
+        condition: service_started
+    healthcheck:
+      test: ["CMD", "python", "-c", "import sys,urllib.request; sys.exit(0 if urllib.request.urlopen('http://localhost:8501/_stcore/health', timeout=3).status == 200 else 1)"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
 
 volumes:
   # Volume nomeado e persistente com os datafiles do Oracle.

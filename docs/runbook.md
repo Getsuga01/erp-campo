@@ -4,7 +4,7 @@
 >
 > Endereços e credenciais da demo: simulador `http://localhost:8001` (key `campo-dev-key-001`), integrador `http://localhost:8002` (key `integrador-dev-key-001`), painel `http://localhost:8501`, Oracle XE no container `campo-erp-oracle` (usuários/senhas fictícias em `db/01_schema.sql`).
 >
-> Prints das telas do painel serão anexados na Task 7 (E2E com o stack completo via docker compose).
+> Capturas reais das telas do painel (todas as páginas, E2E ao vivo): [`docs/prints/`](prints/) — visão geral, conciliação, rejeições, fila, lotes e reprocessamento.
 
 ---
 

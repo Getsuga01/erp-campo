@@ -24,18 +24,19 @@ flowchart LR
 
 ## Como subir
 
-### 1) Oracle XE (docker)
+### 1) Stack completo (docker compose — Oracle + 4 portas)
 
 ```powershell
-copy .env.example .env          # defina ORACLE_PASSWORD
-docker compose up -d            # primeiro boot: roda db/01..08 automaticamente
+copy .env.example .env          # informe ORACLE_PASSWORD (defaults de demo para o resto)
+docker compose up -d --build    # oracle (1521) + simulador (8001) + integrador (8002) + painel (8501)
+docker compose ps               # aguarde todos em (healthy)
 ```
 
-O healthcheck demora alguns minutos no primeiro boot (criação do banco + scripts). Conexão: `localhost:1521/XEPDB1`.
+- No **primeiro boot** do Oracle os scripts de `db/` (01→08) rodam via sqlplus automaticamente (demora alguns minutos); com o volume já existente, o banco é reaproveitado.
+- Dentro da rede do compose os serviços se enxergam pelos nomes (`oracle`, `simulador`, `integrador`) — os defaults de "localhost" do código são sobrescritos pelo `environment` do compose.
+- Parar tudo: `docker compose down` (o volume `campo-erp-oracle-data` preserva o banco).
 
-> **Nota**: o `docker-compose.yml` atual sobe apenas o Oracle (Fase 1). Os serviços de aplicação entram no compose na Fase 7 do plano; hoje os módulos sobem manualmente (a seguir).
-
-### 2) Módulos (uvicorn/streamlit a partir da raiz do repo)
+### 2) Módulos manualmente (alternativa sem Docker para as apps)
 
 ```powershell
 # venv na raiz do repo
@@ -85,7 +86,21 @@ curl.exe -s -X POST -H "X-API-Key: integrador-dev-key-001" -H "Content-Type: app
 curl.exe -s -H "X-API-Key: integrador-dev-key-001" http://localhost:8002/conciliacao
 ```
 
-Acompanhe tudo no **painel** (`http://localhost:8501`): Visão Geral com os indicadores obrigatórios (recebidos × gravados × rejeitados × duplicados × pendentes, taxa de sucesso, top 5 motivos, tempos, idade da fila, divergência), Conciliação origem × destino por dia/tipo (divergências em vermelho), Rejeições com export CSV, Fila/dead-letter, histórico de Lotes e Reprocessamento manual. *(Capturas de tela do painel serão incluídas na Fase 7, no E2E com o stack completo.)*
+Acompanhe tudo no **painel** (`http://localhost:8501`): Visão Geral com os indicadores obrigatórios (recebidos × gravados × rejeitados × duplicados × pendentes, taxa de sucesso, top 5 motivos, tempos, idade da fila, divergência), Conciliação origem × destino por dia/tipo (divergências em vermelho), Rejeições com export CSV, Fila/dead-letter, histórico de Lotes e Reprocessamento manual.
+
+### Capturas do painel (E2E real, dados ao vivo)
+
+| Visão Geral (indicadores) | Conciliação (divergências em vermelho) |
+|---|---|
+| ![Visão Geral](docs/prints/visao_geral.png) | ![Conciliação](docs/prints/conciliacao.png) |
+
+| Rejeições (filtros + CSV) | Fila (pendentes + dead-letter) |
+|---|---|
+| ![Rejeições](docs/prints/rejeicoes.png) | ![Fila](docs/prints/fila.png) |
+
+| Lotes (histórico + drill-down) | Reprocessamento (ação manual auditável) |
+|---|---|
+| ![Lotes](docs/prints/lotes.png) | ![Reprocessamento](docs/prints/reprocessamento.png) |
 
 ## Testes
 
@@ -140,16 +155,17 @@ suprimentos/
 ├── db/                # DDL 01–08: schemas, cadastros, views, carga, grants
 ├── docs/              # contrato_dados · catalogo_erros · runbook · diagramas · decisões
 ├── tests/             # pytest — 85 testes sem Oracle local
-├── docker-compose.yml # Oracle XE (apps entram na Fase 7)
-└── .env.example       # ORACLE_PASSWORD (nenhum segredo real)
+├── docs/prints/       # capturas do painel (E2E real)
+├── docker-compose.yml # stack completo: oracle + simulador + integrador + painel
+└── .env.example       # todas as variáveis (nenhum segredo real)
 ```
 
 Documentação detalhada: [contrato de dados](docs/contrato_dados.md) · [catálogo de erros INT-001…099](docs/catalogo_erros.md) · [runbook de operação (5 cenários)](docs/runbook.md) · [diagramas](docs/diagrama_arquitetura.md) · [decisões técnicas](docs/decisoes_tecnicas.md).
 
 ## Limitações e próximos passos
 
-- **Compose completo** (Fase 7): Oracle hoje; simulador/integrador/painel entram com Dockerfiles + healthchecks + `.env.example` ampliado.
-- **E2E automatizado** (Fase 7): subir tudo, popular, injetar falhas, reprocessar e fechar a conciliação com prints do painel.
 - Single-worker: o reprocessador usa `ROWNUM = 1` antes do `FOR UPDATE SKIP LOCKED` (ver `docs/decisoes_tecnicas.md`, item 7 — irrelevante na demo, limitação real em multi-worker).
 - Erros 4xx inesperados da origem viram `INT-099` sem retry — um código próprio (ex.: `INT-05x`) seria evolução natural do catálogo.
 - A fila não tem expurgo automático de itens `CONCLUIDA` (auditoria da demo; em produção, particionamento/arquivamento).
+- `use_container_width` no painel está deprecado no Streamlit atual — modernizar para `width='stretch'` é um ajuste barato futuro.
+- Evoluções naturais: CI rodando os 85 testes; políticas de retenção da fila; autenticação do painel (interno por design).
