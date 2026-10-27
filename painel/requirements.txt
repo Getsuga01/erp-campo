@@ -1,0 +1,6 @@
+# Dependências do Painel de Conciliação (Módulo C)
+streamlit>=1.36  # framework do painel multi-page (st.navigation/st.Page)
+python-oracledb>=2.4  # consultas read-only ao Oracle em modo THIN (sem instant client)
+httpx>=0.27  # chamada ao POST /reprocessar do integrador
+pydantic-settings>=2.3  # settings via env vars com prefixo PAINEL_
+pandas>=2.2  # DataFrames das tabelas e gráficos
