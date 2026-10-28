@@ -35,7 +35,7 @@ def exibir_tabela(
 
     if coluna_alerta and coluna_alerta in fatia.columns:
         fatia = _com_realce_vermelho(fatia, coluna_alerta)
-    st.dataframe(fatia, width="stretch", hide_index=True)
+    st.dataframe(fatia, width="stretch", hide_index=True, height=340)
 
     st.download_button(
         "baixar CSV (base completa)",
@@ -50,6 +50,6 @@ def _com_realce_vermelho(df: pd.DataFrame, coluna_alerta: str):
     """Devolve um Styler com a linha inteira em vermelho quando a coluna de alerta != 0."""
 
     def _pintar(linha) -> list[str]:
-        return ["color: #d32f2f"] * len(linha) if linha[coluna_alerta] != 0 else [""] * len(linha)
+        return ["color: #C62828; font-weight: 600"] * len(linha) if linha[coluna_alerta] != 0 else [""] * len(linha)
 
     return df.style.apply(_pintar, axis=1)

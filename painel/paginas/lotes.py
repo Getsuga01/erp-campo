@@ -10,7 +10,7 @@ import pandas as pd
 import streamlit as st
 
 from componentes.tabelas import exibir_tabela
-from config import consultar, para_sao_paulo
+from config import consultar, obter_settings, para_sao_paulo
 
 _SQL_LOTES = (
     "SELECT lote_id, status, total_recebidos, total_gravados, total_rejeitados, total_duplicados, "
@@ -38,12 +38,14 @@ def carregar_lotes(
         "de": datetime.combine(de, time.min) if de is not None else None,
         "ate": datetime.combine(ate + timedelta(days=1), time.min) if ate is not None else None,
     }
-    return pd.DataFrame(consultar(_SQL_LOTES, filtros))
+    return pd.DataFrame(consultar(_SQL_LOTES, filtros, limite=obter_settings().limite_listagem))
 
 
 def carregar_registros_lote(lote_id: int) -> pd.DataFrame:
     """Registros vinculados a um lote (drill-down por item, read-only)."""
-    return pd.DataFrame(consultar(_SQL_REGISTROS_LOTE, {"lote": lote_id}))
+    return pd.DataFrame(
+        consultar(_SQL_REGISTROS_LOTE, {"lote": lote_id}, limite=obter_settings().limite_listagem)
+    )
 
 
 def render() -> None:

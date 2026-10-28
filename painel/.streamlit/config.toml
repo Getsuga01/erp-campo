@@ -1,0 +1,8 @@
+# Tema Streamlit — dashboard ERP (Minimalist Slate), alinhado ao tema.py.
+[theme]
+base = "light"
+primaryColor = "#37474F"
+backgroundColor = "#F8F9FA"
+secondaryBackgroundColor = "#FFFFFF"
+textColor = "#212529"
+font = "sans serif"

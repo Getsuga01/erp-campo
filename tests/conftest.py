@@ -13,7 +13,7 @@ Duas peças centrais:
    (fidelidade ao commit por registro: INSERT não-commitado é revertido).
    Nenhum teste exige Oracle local (ruling R5 do ledger).
 
-O helper `rodar_ciclo` substitui `ciclo.consumir_todas_paginas`; a regra 12
+O helper `rodar_ciclo` substitui `ciclo.consumir_paginas`; a regra 12
 (test_resiliencia) usa o consumidor REAL com httpx MockTransport e backoff
 sem sleep.
 """
@@ -737,11 +737,15 @@ def _proibir_oracle_real(int_mod, monkeypatch):
 
 
 def rodar_ciclo(int_mod, monkeypatch, itens: list[dict], cursor_final: str = CURSOR_FINAL_PADRAO):
-    """Executa um ciclo com consumidor fake retornando `itens` (regra 1–3, 10)."""
+    """Executa um ciclo com consumidor fake retornando `itens` (regra 1–3, 10).
+
+    O fake substitui `ciclo.consumir_paginas` (generator em streaming): entrega
+    todos os `itens` como UMA página e encerra — o ciclo processa página a página.
+    """
     ciclo = int_mod("ciclo")
 
     async def _consumir_fake(cursor_atual):
-        return list(itens), cursor_final
+        yield list(itens), cursor_final
 
-    monkeypatch.setattr(ciclo, "consumir_todas_paginas", _consumir_fake)
+    monkeypatch.setattr(ciclo, "consumir_paginas", _consumir_fake)
     return asyncio.run(ciclo.executar_ciclo())

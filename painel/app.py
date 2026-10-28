@@ -25,6 +25,7 @@ import streamlit as st
 
 from config import obter_settings
 from paginas import conciliacao, fila, lotes, rejeicoes, reprocessamento, visao_geral
+from tema import aplicar_tema
 
 st.set_page_config(
     page_title="Painel de Conciliação — Campo → ERP",
@@ -32,6 +33,10 @@ st.set_page_config(
     layout="wide",
     initial_sidebar_state="expanded",
 )
+
+# Tema visual "dashboard ERP" (SAP Fiori/Odoo style): fundo cinza, cards brancos
+# com borda 1px, paleta slate, tipografia Inter tabular — ver tema.py.
+aplicar_tema()
 
 st.sidebar.title("🌾 Campo → ERP")
 st.sidebar.caption("painel de conciliação da integração — horários em America/Sao_Paulo (banco em UTC)")

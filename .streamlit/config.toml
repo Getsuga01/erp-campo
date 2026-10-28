@@ -1,0 +1,10 @@
+# Tema Streamlit — dashboard ERP (Minimalist Slate), alinhado ao painel/tema.py.
+# Duplicado aqui para rodar o app a partir da raiz (streamlit run painel/app.py)
+# e dentro do Docker (painel/.streamlit/config.toml).
+[theme]
+base = "light"
+primaryColor = "#37474F"
+backgroundColor = "#F8F9FA"
+secondaryBackgroundColor = "#FFFFFF"
+textColor = "#212529"
+font = "sans serif"

@@ -8,7 +8,7 @@ import pandas as pd
 import streamlit as st
 
 from componentes.tabelas import exibir_tabela
-from config import consultar, para_sao_paulo
+from config import consultar, obter_settings, para_sao_paulo
 
 _SQL_STATUS = "SELECT situacao, qtd, idade_mais_antigo_min FROM V_FILA_STATUS ORDER BY situacao"
 
@@ -26,8 +26,8 @@ def carregar_status_fila() -> list[dict]:
 
 
 def carregar_itens_fila() -> pd.DataFrame:
-    """Todos os itens da fila com dados do registro vinculado (read-only)."""
-    return pd.DataFrame(consultar(_SQL_ITENS))
+    """Itens da fila com dados do registro vinculado (read-only), com corte de segurança."""
+    return pd.DataFrame(consultar(_SQL_ITENS, limite=obter_settings().limite_listagem))
 
 
 def render() -> None:

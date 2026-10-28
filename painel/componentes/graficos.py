@@ -2,10 +2,27 @@
 
 O Altair já acompanha o Streamlit (nenhuma dependência extra). Os DataFrames
 chegam prontos das páginas; aqui apenas se escolhe a marca e os canais.
+
+Estilo dashboard ERP (tema.py): paleta slate para dados, fundo dos gráficos
+branco com borda discreta, títulos pequenos e sobrios. Vermelho/verde NÃO
+entrando na paleta da série — ficam reservados para divergência/tendência.
 """
 import altair as alt
 import pandas as pd
 import streamlit as st
+
+from tema import PALETA_SLATE
+
+
+def _configurar(grafico: alt.Chart, titulo: str) -> alt.Chart:
+    """Applya o estilo comum: fundo branco, borda, título sóbrio e paleta slate."""
+    return (
+        grafico.properties(title=titulo, padding=12)
+        .configure_title(fontSize=12, fontWeight=600, color="#37474F", dy=-8)
+        .configure_axis(labelColor="#6C757D", titleColor="#6C757D", domainColor="#E9ECEF", gridColor="#F1F3F5")
+        .configure_view(fill="#FFFFFF", stroke="#E9ECEF", cornerRadius=8)
+        .configure_range(category=alt.RangeScheme(PALETA_SLATE))
+    )
 
 
 def grafico_barras(df: pd.DataFrame, eixo_x: str, eixo_y: str, titulo: str) -> None:
@@ -15,15 +32,14 @@ def grafico_barras(df: pd.DataFrame, eixo_x: str, eixo_y: str, titulo: str) -> N
         return
     grafico = (
         alt.Chart(df)
-        .mark_bar()
+        .mark_bar(color="#37474F", cornerRadius=3)
         .encode(
             x=alt.X(eixo_x, sort="-y"),
             y=eixo_y,
             tooltip=[eixo_x, eixo_y],
         )
-        .properties(title=titulo)
     )
-    st.altair_chart(grafico, width="stretch")
+    st.altair_chart(_configurar(grafico, titulo), width="stretch")
 
 
 def grafico_linhas(
@@ -37,8 +53,12 @@ def grafico_linhas(
     if serie:
         canais["color"] = serie
         canais["tooltip"].append(serie)
-    grafico = alt.Chart(df).mark_line(point=True).encode(**canais).properties(title=titulo)
-    st.altair_chart(grafico, width="stretch")
+        marcas_kwargs = {"point": True, "size": 65}
+    else:
+        canais["color"] = alt.value("#546E7A")
+        marcas_kwargs = {"point": True, "size": 50}
+    grafico = alt.Chart(df).mark_line(**marcas_kwargs).encode(**canais)
+    st.altair_chart(_configurar(grafico, titulo), width="stretch")
 
 
 def grafico_pizza(df: pd.DataFrame, fatia: str, valor: str, titulo: str) -> None:
@@ -51,5 +71,5 @@ def grafico_pizza(df: pd.DataFrame, fatia: str, valor: str, titulo: str) -> None
         color=alt.Color(fatia, type="nominal"),
         tooltip=[fatia, valor],
     )
-    grafico = base.mark_arc(innerRadius=50, outerRadius=120, stroke="#fff").properties(title=titulo)
-    st.altair_chart(grafico, width="stretch")
+    grafico = base.mark_arc(innerRadius=55, outerRadius=120, stroke="#FFFFFF", strokeWidth=2)
+    st.altair_chart(_configurar(grafico, titulo), width="stretch")

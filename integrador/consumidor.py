@@ -11,6 +11,11 @@ relógio/t0.
 Retry com backoff exponencial: 3 tentativas em 5xx da origem (INT-051)
 e timeout/erro de rede (INT-050). Após esgotar, o ciclo marca o lote
 FALHOU (regra 12 do plano).
+
+Escalabilidade: `consumir_paginas` é um async generator — o ciclo processa
+cada página conforme chega (pipeline), sem acumular TODOS os itens da
+origem em RAM (backlog grande não estoura memória). `consumir_todas_paginas`
+permanece disponível como utilitário/tests (agregador do generator).
 """
 import asyncio
 
@@ -26,16 +31,15 @@ logger = obter_logger()
 MAX_TENTATIVAS_HTTP = 3
 
 
-async def consumir_todas_paginas(cursor_atual: str | None) -> tuple[list[dict], str | None]:
-    """Consome todas as páginas pendentes a partir do cursor do banco.
+async def consumir_paginas(cursor_atual: str | None):
+    """Async generator: (itens, proximo_cursor) de cada página consumida.
 
-    Retorna (itens, cursor_final): cursor_final é o último
-    proximo_cursor recebido — None quando nada foi servido (origem sem
-    novidades; o cursor do banco não precisa avançar).
+    Consumo em streaming — cada página é entregue ao chamador imediatamente,
+    com retry já embutido em `_obter_pagina`. A sentinela/None na entrada
+    significa "desde o início". Exceções (INT-050/051/099) abortam o
+    generator na página em que ocorrerem — o chamador decide o desfecho.
     """
     cfg = obter_settings()
-    itens: list[dict] = []
-    cursor_final: str | None = None
     cursor_pagina = _cursor_para_request(cursor_atual)
     async with httpx.AsyncClient(
         timeout=cfg.timeout_http_seg, headers={"X-API-Key": cfg.campo_api_key}
@@ -43,12 +47,28 @@ async def consumir_todas_paginas(cursor_atual: str | None) -> tuple[list[dict], 
         while True:
             resposta = await _obter_pagina(client, cursor_pagina)
             pagina = _interpretar(resposta)
-            itens.extend(pagina["itens"])
-            if pagina["proximo_cursor"] is not None:
-                cursor_final = pagina["proximo_cursor"]
-            if len(pagina["itens"]) < cfg.limite_pagina:
+            yield pagina["itens"], pagina["proximo_cursor"]
+            if len(pagina["itens"]) < cfg.limite_pagina or pagina["proximo_cursor"] is None:
                 break
             cursor_pagina = pagina["proximo_cursor"]
+
+
+async def consumir_todas_paginas(cursor_atual: str | None) -> tuple[list[dict], str | None]:
+    """Consome todas as páginas pendentes a partir do cursor do banco.
+
+    Retorna (itens, cursor_final): cursor_final é o último
+    proximo_cursor recebido — None quando nada foi servido (origem sem
+    novidades; o cursor do banco não precisa avançar).
+
+    ATENÇÃO: agrega a origem inteira em RAM; preferir `consumir_paginas`
+    no ciclo (o backlog da origem pode não caber em memória).
+    """
+    itens: list[dict] = []
+    cursor_final: str | None = None
+    async for itens_pagina, proximo_cursor in consumir_paginas(cursor_atual):
+        itens.extend(itens_pagina)
+        if proximo_cursor is not None:
+            cursor_final = proximo_cursor
     return itens, cursor_final
 
 

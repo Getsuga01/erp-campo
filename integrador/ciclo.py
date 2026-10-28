@@ -1,9 +1,13 @@
 """Orquestração do ciclo de integração (3.13) — o coração do Módulo B.
 
-Fluxo: ler cursor → consumir TODAS as páginas (retry 3x em 5xx/rede) →
-criar lote → para cada registro: idempotência → validação → grava OU
-rejeita (um registro ruim NÃO derruba o lote — regra 3) → fechar lote →
-avançar cursor (SÓ após o lote totalmente persistido — regra 2).
+Fluxo (em STREAMING por página — escalabilidade): ler cursor → consumir
+cada página (retry 3x em 5xx/rede) → criar lote na 1ª página com itens →
+para cada registro: idempotência → validação → grava OU rejeita (um
+registro ruim NÃO derruba o lote — regra 3) → ao fim de todas as
+páginas: fechar lote → avançar cursor (SÓ após o lote totalmente
+persistido — regra 2). Processar página a página evita acumular um
+backlog inteiro da origem em RAM; a idempotência cobre o que já foi
+gravado.
 
 Falha de infraestrutura (origem INT-050/051, banco INT-052) fecha o lote
 como FALHOU com o código no observacao e o cursor NÃO avança — o
@@ -11,12 +15,15 @@ próximo ciclo repega tudo (idempotência cuida dos já processados).
 
 POST /ciclo/executar e o job agendado chamam a MESMA função; um lock
 simples evita execuções sobrepostas (job × manual × reprocessador).
+As operações síncronas do Oracle (bloqueantes) rodar via
+asyncio.to_thread — o event loop da API admin nunca fica preso.
 """
+import asyncio
 import threading
 
 import oracledb
 
-from consumidor import consumir_todas_paginas
+from consumidor import consumir_paginas
 from cursor import avancar_cursor, ler_cursor
 from erros import ErroCiclo, ErroRejeicao
 from gravador import gravar
@@ -58,18 +65,23 @@ async def _executar() -> dict:
 
 async def _executar_interno() -> dict:
     cursor_inicio = ler_cursor()
-    try:
-        itens, cursor_final = await consumir_todas_paginas(cursor_inicio)
-    except ErroCiclo as erro:
-        return _fechar_como_falha(cursor_inicio, 0, erro)
-    if not itens:
-        logger.info("nada novo a consumir na origem")
-        return {"status": "SEM_DADOS", "lote_id": None, "consumidos": 0, "cursor_inicio": cursor_inicio}
-    lote_id = criar_lote(cursor_inicio)
+    lote_id: int | None = None
     duplicados = 0
+    cursor_final: str | None = None
+    recebeu_dados = False
     try:
-        for item in itens:
-            duplicados += _processar_item(lote_id, item)
+        async for itens, proximo_cursor in consumir_paginas(cursor_inicio):
+            if proximo_cursor is not None:
+                cursor_final = proximo_cursor
+            if not itens:
+                continue
+            recebeu_dados = True
+            if lote_id is None:
+                lote_id = await asyncio.to_thread(criar_lote, cursor_inicio)
+            for item in itens:
+                duplicados += await asyncio.to_thread(_processar_item, lote_id, item)
+    except ErroCiclo as erro:
+        return _fechar_como_falha(cursor_inicio, duplicados, erro, lote_id)
     except oracledb.Error as erro:
         return _fechar_como_falha(
             cursor_inicio,
@@ -77,8 +89,13 @@ async def _executar_interno() -> dict:
             ErroCiclo("INT-052", str(erro).splitlines()[0][:400]),
             lote_id,
         )
-    resumo = fechar_lote(lote_id, duplicados, "CONCLUIDO", cursor_fim=cursor_final)
-    avancar_cursor(cursor_final)
+    if not recebeu_dados:
+        logger.info("nada novo a consumir na origem")
+        return {"status": "SEM_DADOS", "lote_id": None, "consumidos": 0, "cursor_inicio": cursor_inicio}
+    resumo = await asyncio.to_thread(
+        fechar_lote, lote_id, duplicados, "CONCLUIDO", cursor_fim=cursor_final
+    )
+    await asyncio.to_thread(avancar_cursor, cursor_final)
     logger.info("ciclo concluído", extra={"lote_id": lote_id})
     return {**resumo, "cursor_inicio": cursor_inicio, "cursor_fim": cursor_final}
 

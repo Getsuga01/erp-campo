@@ -45,6 +45,14 @@ class Settings(BaseSettings):
     # Timeout HTTP para a chamada de reprocessamento no integrador.
     timeout_http_seg: int = 10
 
+    # Pool de conexões Oracle — no painel o gargalo é leitura concorrente,
+    # então o padrão já vem maior que o do integrador (PAINEL_POOL_MAX).
+    pool_max: int = 20
+
+    # Limite padrão de linhas para consultas de LISTAGEM (defesa contra
+    # fetchall() gigantes com muitos usuários concorrentes).
+    limite_listagem: int = 5000
+
 
 @lru_cache
 def obter_settings() -> Settings:
@@ -60,17 +68,28 @@ def obter_pool() -> oracledb.SessionPool:
         user=cfg.oracle_usuario,
         password=cfg.oracle_senha,
         dsn=cfg.oracle_dsn,
-        min=1,
-        max=5,
+        min=2,
+        max=cfg.pool_max,
         increment=1,
     )
 
 
-def consultar(sql: str, parametros: dict | None = None) -> list[dict]:
-    """Executa um SELECT e devolve as linhas como dicionários (colunas minúsculas)."""
+def consultar(sql: str, parametros: dict | None = None, limite: int | None = None) -> list[dict]:
+    """Executa um SELECT e devolve as linhas como dicionários (colunas minúsculas).
+
+    `limite`, quando informado, anexa `FETCH FIRST :limite_consulta ROWS ONLY`
+    (ignorado se o SQL já traz FETCH FIRST/ROWNUM). Usar nas listagens — evita
+    carregar resultSets gigantes na memória do painel com muitos usuários.
+    """
+    texto = sql
+    valores = dict(parametros or {})
+    ja_limitado = any(marcador in texto.casefold() for marcador in ("fetch first", " rownum"))
+    if limite is not None and not ja_limitado:
+        texto = f"{texto.rstrip().rstrip(';')} FETCH FIRST :limite_consulta ROWS ONLY"
+        valores["limite_consulta"] = int(limite)
     with obter_pool().acquire() as conn:
         cur = conn.cursor()
-        cur.execute(sql, parametros or {})
+        cur.execute(texto, valores)
         colunas = [descricao[0].lower() for descricao in cur.description]
         return [dict(zip(colunas, linha)) for linha in cur.fetchall()]
 

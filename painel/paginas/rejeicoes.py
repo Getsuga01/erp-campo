@@ -11,7 +11,7 @@ import streamlit as st
 
 from componentes.graficos import grafico_barras
 from componentes.tabelas import exibir_tabela
-from config import consultar, para_sao_paulo
+from config import consultar, obter_settings, para_sao_paulo
 
 # Base INT_REGISTRO (a view V_TOP_ERROS não aceita filtros por lote/tipo/período
 # nem expõe payload/talhão) — leitura read-only.
@@ -50,7 +50,7 @@ def carregar_rejeicoes(
         "de": datetime.combine(de, time.min) if de is not None else None,
         "ate": datetime.combine(ate + timedelta(days=1), time.min) if ate is not None else None,
     }
-    return pd.DataFrame(consultar(_SQL, filtros))
+    return pd.DataFrame(consultar(_SQL, filtros, limite=obter_settings().limite_listagem))
 
 
 def render() -> None:

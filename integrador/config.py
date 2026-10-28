@@ -39,6 +39,11 @@ class Settings(BaseSettings):
     timeout_http_seg: int = 10
     limite_pagina: int = 100
 
+    # Pool de conexões Oracle (min/max) — pool maior = mais paralelismo de
+    # gravação/reprocessamento; em produção dimensionar junto ao lado do banco.
+    pool_min: int = 2
+    pool_max: int = 10
+
 
 @lru_cache
 def obter_settings() -> Settings:

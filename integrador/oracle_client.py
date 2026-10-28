@@ -27,8 +27,8 @@ def obter_pool() -> oracledb.SessionPool:
             user=cfg.oracle_usuario,
             password=cfg.oracle_senha,
             dsn=cfg.oracle_dsn,
-            min=1,
-            max=5,
+            min=cfg.pool_min,
+            max=cfg.pool_max,
             increment=1,
         )
     return _pool

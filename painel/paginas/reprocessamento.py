@@ -21,8 +21,8 @@ _SQL_CANDIDATOS = (
 
 
 def carregar_candidatos() -> pd.DataFrame:
-    """Itens reprocessáveis: fila PENDENTE ou DEAD_LETTER (read-only)."""
-    return pd.DataFrame(consultar(_SQL_CANDIDATOS))
+    """Itens reprocessáveis: fila PENDENTE ou DEAD_LETTER (read-only), com corte de segurança."""
+    return pd.DataFrame(consultar(_SQL_CANDIDATOS, limite=obter_settings().limite_listagem))
 
 
 def acionar_reprocessamento(registro_ids: list[int], motivo: str, acionado_por: str) -> dict:
