@@ -182,7 +182,7 @@ def render() -> None:
                 ]
             )
             grafico_barras(df_erros, "código", "qtd", "rejeições por motivo")
-            st.dataframe(df_erros, use_container_width=True, hide_index=True)
+            st.dataframe(df_erros, width="stretch", hide_index=True)
         else:
             st.info("nenhuma rejeição registrada")
     with coluna_pizza:

@@ -23,7 +23,7 @@ def grafico_barras(df: pd.DataFrame, eixo_x: str, eixo_y: str, titulo: str) -> N
         )
         .properties(title=titulo)
     )
-    st.altair_chart(grafico, use_container_width=True)
+    st.altair_chart(grafico, width="stretch")
 
 
 def grafico_linhas(
@@ -38,7 +38,7 @@ def grafico_linhas(
         canais["color"] = serie
         canais["tooltip"].append(serie)
     grafico = alt.Chart(df).mark_line(point=True).encode(**canais).properties(title=titulo)
-    st.altair_chart(grafico, use_container_width=True)
+    st.altair_chart(grafico, width="stretch")
 
 
 def grafico_pizza(df: pd.DataFrame, fatia: str, valor: str, titulo: str) -> None:
@@ -52,4 +52,4 @@ def grafico_pizza(df: pd.DataFrame, fatia: str, valor: str, titulo: str) -> None
         tooltip=[fatia, valor],
     )
     grafico = base.mark_arc(innerRadius=50, outerRadius=120, stroke="#fff").properties(title=titulo)
-    st.altair_chart(grafico, use_container_width=True)
+    st.altair_chart(grafico, width="stretch")

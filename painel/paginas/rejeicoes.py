@@ -93,6 +93,6 @@ def render() -> None:
         .sort_values("qtd", ascending=False)
     )
     grafico_barras(resumo, "codigo_erro", "qtd", "rejeições por motivo (filtro atual)")
-    st.dataframe(resumo, use_container_width=True, hide_index=True)
+    st.dataframe(resumo, width="stretch", hide_index=True)
 
     exibir_tabela(df, "rejeicoes", "Detalhes")

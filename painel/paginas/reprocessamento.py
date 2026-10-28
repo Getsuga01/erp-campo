@@ -54,7 +54,7 @@ def render() -> None:
 
     if not candidatos.empty:
         candidatos["criado_em"] = candidatos["criado_em"].map(para_sao_paulo)
-    st.dataframe(candidatos, use_container_width=True, hide_index=True)
+    st.dataframe(candidatos, width="stretch", hide_index=True)
 
     rotulos = {
         f"{int(linha['registro_id'])} | {linha['id_origem']} | {linha['situacao']}": int(linha["registro_id"])
@@ -82,4 +82,4 @@ def render() -> None:
             st.error(f"falha ao chamar o integrador: {erro}")
             return
         st.success(f"{resultado['reprocessados']} de {len(registro_ids)} item(ns) processado(s)")
-        st.dataframe(pd.DataFrame(resultado["resultados"]), use_container_width=True, hide_index=True)
+        st.dataframe(pd.DataFrame(resultado["resultados"]), width="stretch", hide_index=True)

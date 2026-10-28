@@ -1,5 +1,8 @@
 # Integração Sistema de Campo → ERP — Projeto 2 (demo fictícia)
 
+[![CI](https://github.com/Getsuga01/erp-campo/actions/workflows/ci.yml/badge.svg)](https://github.com/Getsuga01/erp-campo/actions/workflows/ci.yml)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+
 > ⚠️ **DISCLAIMER**: projeto **fictício** de portfólio. Todos os dados, cadastros (talhões, equipamentos, itens), nomes de operadores, chaves de API e senhas são inventados; **nenhum** sistema, empresa, marca ou dado real está envolvido. Nada aqui se conecta a sistemas de produção.
 
 Pipeline de integração que recebe **apontamentos operacionais** (pesagem, horas de máquina e insumos) de um sistema de campo simulado, valida contra um contrato de dados, grava no **Oracle XE** (ERP fictício), gerencia rejeições com **fila de reprocessamento + dead-letter** e oferece um **painel de conciliação** para monitorar divergências.
@@ -110,6 +113,34 @@ Acompanhe tudo no **painel** (`http://localhost:8501`): Visão Geral com os indi
 
 Cobertura (plano, Fase 5): regra 1 (idempotência), 2 (cursor seguro), 3 (falha parcial), 4 (peso), 5 (cadastros), 6 (data UTC/futuro), 7 (retentativa), 8 (horas/revalidação), 9 (dead-letter/manual), 10 (equação de conciliação), 12 (retry de origem) e 13 (versão de contrato). Detalhes em `docs/decisoes_tecnicas.md` (item 13).
 
+## Deploy online (demo pública — Oracle Cloud Always Free)
+
+Para outros usuários testarem sem instalar nada, a stack roda inteira numa VM **gratuita e vitalícia** da Oracle Cloud (ARM Ampere A1, 2 OCPU/12 GB) — com a simetria de um Oracle Database rodando na nuvem da própria Oracle. Acesso público só ao painel, via **Cloudflare Tunnel** (HTTPS, sem abrir portas).
+
+| Diferença vs. desenvolvimento local | Por quê |
+|---|---|
+| Imagem `gvenzl/oracle-free:23-slim-faststart` (não `oracle-xe:21-slim`) | XE 21c não tem port para ARM; 23ai Free é multi-arch. O PDB muda: `XEPDB1` → `FREEPDB1` |
+| Scripts SQL de `db-deploy/` (gerados do `db/` pelo setup) | Fonte única: `deploy/setup-vm.sh` aplica `XEPDB1 → FREEPDB1` no sed |
+| Nenhuma porta pública (só o painel em `127.0.0.1:8501` para o tunnel) | Oracle/simulador/integrador ficam inacessíveis de fora |
+| Chaves de API obrigatórias e geradas com `openssl rand` | As chaves deste README são públicas no repositório |
+
+```powershell
+# 1) Criar conta em cloud.oracle.com (Free Tier) e uma VM Ubuntu 22.04+ ARM
+#    shape VM.Standard.A1.Flex (2 OCPU, 12 GB) — Always Free. Abrir só a 22.
+
+# 2) Na VM: clonar o repo e rodar o setup (idempotente)
+git clone https://github.com/SEU-USUARIO/SEU-REPO && cd SEU-REPO
+sudo bash deploy/setup-vm.sh    # Docker + .env com chaves fortes + db-deploy + stack + cloudflared
+
+# 3) Tunnel (one-time) — o script imprime os passos: tunnel login → create
+#    campo-erp → route dns painel.SEU-DOMINIO → config.yml → service install
+
+# 4) Cloudflare Access (Zero Trust > Access > Applications): proteger o
+#    painel por e-mail — o painel não tem auth própria (interno por design)
+```
+
+Com o tunnel no ar, distribua `https://painel.SEU-DOMINIO` — o ciclo de integração roda sozinho a cada 5 min e os testers acompanham tudo pelo painel.
+
 ## Endpoints
 
 ### Simulador (8001) — auth `X-API-Key: campo-dev-key-001` (exceto /health)
@@ -156,7 +187,9 @@ suprimentos/
 ├── docs/              # contrato_dados · catalogo_erros · runbook · diagramas · decisões
 ├── tests/             # pytest — 85 testes sem Oracle local
 ├── docs/prints/       # capturas do painel (E2E real)
+├── deploy/            # setup da VM de deploy online (Oracle Cloud ARM)
 ├── docker-compose.yml # stack completo: oracle + simulador + integrador + painel
+├── docker-compose.deploy.yml # deploy online: 23ai Free/ARM + sem portas públicas
 └── .env.example       # todas as variáveis (nenhum segredo real)
 ```
 
@@ -167,5 +200,4 @@ Documentação detalhada: [contrato de dados](docs/contrato_dados.md) · [catál
 - Single-worker: o reprocessador usa `ROWNUM = 1` antes do `FOR UPDATE SKIP LOCKED` (ver `docs/decisoes_tecnicas.md`, item 7 — irrelevante na demo, limitação real em multi-worker).
 - Erros 4xx inesperados da origem viram `INT-099` sem retry — um código próprio (ex.: `INT-05x`) seria evolução natural do catálogo.
 - A fila não tem expurgo automático de itens `CONCLUIDA` (auditoria da demo; em produção, particionamento/arquivamento).
-- `use_container_width` no painel está deprecado no Streamlit atual — modernizar para `width='stretch'` é um ajuste barato futuro.
-- Evoluções naturais: CI rodando os 85 testes; políticas de retenção da fila; autenticação do painel (interno por design).
+- Evoluções naturais: políticas de retenção da fila; autenticação do painel (interno por design).

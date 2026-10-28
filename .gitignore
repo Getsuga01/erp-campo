@@ -17,6 +17,9 @@ venv/
 # Workspace de execução do plano (SDD)
 .superpowers/
 
+# Scripts SQL gerados para deploy (XEPDB1→FREEPDB1 via deploy/setup-vm.sh)
+db-deploy/
+
 # Docker
 oracle-data/
 

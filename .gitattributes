@@ -1,0 +1,2 @@
+# Scripts bash rodam na VM Linux: forçar LF evita quebra por CRLF do Windows.
+*.sh text eol=lf

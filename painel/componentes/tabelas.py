@@ -35,7 +35,7 @@ def exibir_tabela(
 
     if coluna_alerta and coluna_alerta in fatia.columns:
         fatia = _com_realce_vermelho(fatia, coluna_alerta)
-    st.dataframe(fatia, use_container_width=True, hide_index=True)
+    st.dataframe(fatia, width="stretch", hide_index=True)
 
     st.download_button(
         "baixar CSV (base completa)",

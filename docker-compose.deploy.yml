@@ -1,0 +1,123 @@
+# =============================================================================
+# Projeto 2 (demo fictícia) — Integração Sistema de Campo → ERP
+# DEPLOY ONLINE — Oracle Cloud Always Free (VM ARM Ampere A1) + Cloudflare Tunnel
+#
+# Diferenças em relação ao docker-compose.yml (desenvolvimento local):
+#   * Oracle: gvenzl/oracle-free:23 (23ai Free) — única imagem oficial multi-arch
+#     (roda em ARM); no XE 21c não há port para ARM. O PDB muda: FREEPDB1.
+#   * Scripts SQL: montados de ./db-deploy — gerados por deploy/setup-vm.sh a
+#     partir de ./db com XEPDB1 → FREEPDB1 (fonte única: não edite db-deploy).
+#   * Portas: NENHUMA porta pública. Oracle (1521), simulador (8001) e
+#     integrador (8002) vivem só na rede interna do compose; o painel (8501)
+#     é publicado apenas em 127.0.0.1 para o cloudflared (tunnel) consumir.
+#   * Chaves de API: SEM defaults — obrigatórias no .env (as do README são
+#     públicas no repositório). O setup-vm.sh gera chaves fortes com openssl.
+#
+# Como usar (VM Ubuntu 22.04+ ARM):
+#   sudo bash deploy/setup-vm.sh   # gera .env + db-deploy e sobe a stack
+# =============================================================================
+# Nota: DSNs são fixos (propriedade da topologia do deploy, não configurável
+#       via .env, para não pegar o default XEPDB1 de .env.example por acidente).
+# =============================================================================
+
+services:
+  oracle:
+    image: gvenzl/oracle-free:23-slim-faststart
+    container_name: campo-erp-oracle
+    # Sem "ports": o 1521 NÃO é publicado no host — inacessível de fora.
+    environment:
+      ORACLE_PASSWORD: "${ORACLE_PASSWORD:?ORACLE_PASSWORD nao definida no .env — rode deploy/setup-vm.sh}"
+    volumes:
+      - oracle-data:/opt/oracle/oradata
+      # Scripts com PDB FREEPDB1 (gerados por deploy/setup-vm.sh a partir de ./db).
+      - ./db-deploy:/container-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD", "healthcheck.sh"]
+      interval: 30s
+      timeout: 10s
+      retries: 10
+      start_period: 5m
+    restart: unless-stopped
+
+  simulador:
+    # Módulo A — origem fictícia dos apontamentos (SQLite; não usa Oracle).
+    build:
+      context: .
+      dockerfile: simulador_campo/Dockerfile
+    # Sem "ports": consumido apenas pelo integrador dentro da rede do compose.
+    environment:
+      CAMPO_API_KEY: "${CAMPO_API_KEY:?CAMPO_API_KEY nao definida no .env — rode deploy/setup-vm.sh}"
+      CAMPO_PORTA: "8001"
+      CAMPO_DB_PATH: "${CAMPO_DB_PATH:-data/simulador.db}"
+    healthcheck:
+      test: ["CMD", "python", "-c", "import sys,urllib.request; sys.exit(0 if urllib.request.urlopen('http://localhost:8001/health', timeout=3).status == 200 else 1)"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    restart: unless-stopped
+
+  integrador:
+    # Módulo B — ciclo de integração + API administrativa (porta 8002 interna).
+    build:
+      context: .
+      dockerfile: integrador/Dockerfile
+    environment:
+      # DSN fixo do deploy: PDB da imagem 23ai Free é FREEPDB1 (não XEPDB1).
+      INT_ORACLE_DSN: "oracle:1521/FREEPDB1"
+      INT_ORACLE_USUARIO: "INTEGRACAO"
+      # Senhas fictícias do banco: o 1521 não é publicado, então não há
+      # exposição externa (ver .env.example para a rota de troca real).
+      INT_ORACLE_SENHA: "${INT_ORACLE_SENHA:-IntegracaoFicticia2026}"
+      INT_CAMPO_URL: "http://simulador:8001"
+      # A chave da origem é a MESMA variável do simulador — impossível divergir.
+      INT_CAMPO_API_KEY: "${CAMPO_API_KEY:?CAMPO_API_KEY nao definida no .env}"
+      INT_API_KEY: "${INT_API_KEY:?INT_API_KEY nao definida no .env — rode deploy/setup-vm.sh}"
+    depends_on:
+      oracle:
+        condition: service_healthy
+      simulador:
+        condition: service_started
+    healthcheck:
+      test: ["CMD", "python", "-c", "import sys,urllib.request; sys.exit(0 if urllib.request.urlopen('http://localhost:8002/health', timeout=3).status == 200 else 1)"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    restart: unless-stopped
+
+  painel:
+    # Módulo C — painel de conciliação Streamlit.
+    build:
+      context: .
+      dockerfile: painel/Dockerfile
+    ports:
+      # Somente o painel sai do host — e apenas em loopback: o acesso público
+      # é feito pelo cloudflared (tunnel HTTPS), nunca por porta aberta.
+      - "127.0.0.1:8501:8501"
+    environment:
+      PAINEL_ORACLE_DSN: "oracle:1521/FREEPDB1"
+      PAINEL_ORACLE_USUARIO: "INTEGRACAO"
+      PAINEL_ORACLE_SENHA: "${PAINEL_ORACLE_SENHA:-IntegracaoFicticia2026}"
+      PAINEL_INTEGRADOR_URL: "http://integrador:8002"
+      # Chave do integrador = MESMA variável — impossível divergir da API admin.
+      PAINEL_INTEGRADOR_API_KEY: "${INT_API_KEY:?INT_API_KEY nao definida no .env}"
+      PAINEL_PORTA: "8501"
+      # Demo online: auto-refresh a cada 30s (0 = desligado).
+      PAINEL_AUTO_REFRESH_SEG: "${PAINEL_AUTO_REFRESH_SEG:-30}"
+    depends_on:
+      oracle:
+        condition: service_healthy
+      integrador:
+        condition: service_started
+    healthcheck:
+      test: ["CMD", "python", "-c", "import sys,urllib.request; sys.exit(0 if urllib.request.urlopen('http://localhost:8501/_stcore/health', timeout=3).status == 200 else 1)"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+    restart: unless-stopped
+
+volumes:
+  oracle-data:
+    name: campo-erp-oracle-data

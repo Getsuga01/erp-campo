@@ -1,5 +1,5 @@
 # Dependências do Painel de Conciliação (Módulo C)
-streamlit>=1.36  # framework do painel multi-page (st.navigation/st.Page)
+streamlit>=1.49  # framework do painel multi-page (st.navigation/st.Page; width="stretch" exige >=1.49)
 oracledb>=2.4  # python-oracledb em modo THIN (sem instant client); nome PyPI: oracledb
 httpx>=0.27  # chamada ao POST /reprocessar do integrador
 pydantic-settings>=2.3  # settings via env vars com prefixo PAINEL_
